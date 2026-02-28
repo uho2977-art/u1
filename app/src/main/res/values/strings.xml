@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">OpenClaw Voice</string>
+    <string name="wake_word_prompt">说 "Hey OpenClaw" 开始</string>
+    <string name="listening">正在聆听...</string>
+    <string name="processing">正在处理...</string>
+    <string name="speaking">回复中...</string>
+    <string name="select_agent">选择 Agent</string>
+    <string name="settings">设置</string>
+    <string name="gateway_url">Gateway URL</string>
+    <string name="gateway_token">认证 Token</string>
+    <string name="connect">连接</string>
+    <string name="save">保存</string>
+    <string name="cancel">取消</string>
+    <string name="error">错误</string>
+    <string name="ok">确定</string>
+    <string name="waiting_for_wake_word">等待唤醒词...</string>
+    <string name="ready">准备就绪</string>
+</resources>
