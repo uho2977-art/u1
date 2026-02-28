@@ -10,6 +10,7 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Binder
 import android.os.Build
+import android.os.Bundle
 import android.os.IBinder
 import android.speech.RecognitionListener
 import android.speech.SpeechRecognizer
@@ -23,6 +24,8 @@ import com.openclaw.voice.ui.VoiceState
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import java.util.Locale
 
 class VoiceService : Service(), TextToSpeech.OnInitListener {
 
@@ -75,10 +78,10 @@ class VoiceService : Service(), TextToSpeech.OnInitListener {
     }
     
     private fun updateTtsLanguage() {
-        val lang = App.instance.settingsRepository.language.value
+        val lang = runBlocking { App.instance.settingsRepository.language.first() }
         val locale = when (lang) {
-            "zh" -> java.util.Locale.CHINESE
-            else -> java.util.Locale.ENGLISH
+            "zh" -> Locale.CHINESE
+            else -> Locale.ENGLISH
         }
         tts?.language = locale
     }
@@ -199,7 +202,7 @@ class VoiceService : Service(), TextToSpeech.OnInitListener {
         
         _serviceState.value = VoiceState.LISTENING
         
-        val intent = android.content.Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+        val intent = Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL, 
                 android.speech.RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
             putExtra(android.speech.RecognizerIntent.EXTRA_MAX_RESULTS, 1)

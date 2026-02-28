@@ -39,12 +39,12 @@ enum class VoiceState {
 
 sealed interface UiEvent {
     data class Connect(val url: String, val token: String) : UiEvent
-    data object Disconnect : UiEvent
+    object Disconnect : UiEvent
     data class SelectAgent(val agent: AgentInfo) : UiEvent
-    data class StartListening : UiEvent
+    object StartListening : UiEvent
     data class MessageReceived(val message: String) : UiEvent
-    data object DismissError : UiEvent
-    data object ToggleSettings : UiEvent
-    data object ToggleAgentSelector : UiEvent
+    object DismissError : UiEvent
+    object ToggleSettings : UiEvent
+    object ToggleAgentSelector : UiEvent
     data class UpdateSettings(val url: String, val token: String) : UiEvent
 }

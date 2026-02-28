@@ -120,7 +120,9 @@ class MainViewModel : ViewModel() {
     }
     
     private fun selectAgent(agent: AgentInfo) {
-        settingsRepository.setSelectedAgentId(agent.id)
+        viewModelScope.launch {
+            settingsRepository.setSelectedAgentId(agent.id)
+        }
         _uiState.update { 
             it.copy(
                 selectedAgent = agent,
@@ -236,8 +238,10 @@ class MainViewModel : ViewModel() {
     }
     
     private fun updateSettings(url: String, token: String) {
-        settingsRepository.setGatewayUrl(url)
-        settingsRepository.setGatewayToken(token)
+        viewModelScope.launch {
+            settingsRepository.setGatewayUrl(url)
+            settingsRepository.setGatewayToken(token)
+        }
         _uiState.update { 
             it.copy(
                 gatewayUrl = url,
