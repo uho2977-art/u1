@@ -1,6 +1,5 @@
 package com.openclaw.voice.ui
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -9,7 +8,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -92,7 +93,7 @@ private fun MainContent(
                     .padding(horizontal = 12.dp, vertical = 6.dp)
             ) {
                 Icon(
-                    imageVector = Icons.Default.SmartToy,
+                    imageVector = Icons.Default.Mic,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(16.dp)
@@ -173,10 +174,10 @@ private fun VoiceStateIndicator(
     ) {
         Icon(
             imageVector = when (voiceState) {
-                VoiceState.IDLE -> Icons.Default.MicNone
+                VoiceState.IDLE -> Icons.Default.Mic
                 VoiceState.WAKE_WORD_READY -> Icons.Default.Mic
                 VoiceState.LISTENING -> Icons.Default.Mic
-                VoiceState.PROCESSING -> Icons.Default.HourglassTop
+                VoiceState.PROCESSING -> Icons.Default.Settings
                 VoiceState.SPEAKING -> Icons.Default.VolumeUp
             },
             contentDescription = null,
@@ -203,7 +204,7 @@ private fun BottomActionBar(
             enabled = uiState.isConnected && uiState.agents.isNotEmpty()
         ) {
             Icon(
-                imageVector = Icons.Default.SmartToy,
+                imageVector = Icons.Default.Mic,
                 contentDescription = "选择 Agent",
                 tint = if (uiState.selectedAgent != null) 
                     MaterialTheme.colorScheme.primary 

@@ -64,9 +64,12 @@ class MainViewModel : ViewModel() {
                     val updatedState = uiState.copy(agents = agents)
                     // Auto-select first agent if none selected
                     if (uiState.selectedAgent == null && agents.isNotEmpty()) {
-                        val savedAgentId = settingsRepository.selectedAgentId.value
-                        val agent = if (savedAgentId != null) {
-                            agents.find { it.id == savedAgentId } ?: agents.first()
+                        // Use a local variable to capture the current state
+                        val currentSavedAgentId = try {
+                            settingsRepository.selectedAgentId.first()
+                        } catch (e: Exception) { null }
+                        val agent = if (currentSavedAgentId != null) {
+                            agents.find { it.id == currentSavedAgentId } ?: agents.first()
                         } else {
                             agents.first()
                         }

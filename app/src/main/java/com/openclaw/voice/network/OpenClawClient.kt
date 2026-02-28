@@ -1,6 +1,7 @@
 package com.openclaw.voice.network
 
 import com.openclaw.voice.ui.AgentInfo
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -45,8 +46,8 @@ class OpenClawClient(private val settingsRepository: com.openclaw.voice.data.Set
     }
     
     suspend fun fetchAgents(): List<AgentInfo> {
-        val url = settingsRepository.gatewayUrl.value
-        val token = settingsRepository.gatewayToken.value
+        val url = settingsRepository.gatewayUrl.first()
+        val token = settingsRepository.gatewayToken.first()
         
         // Try to fetch agents via HTTP API
         // OpenClaw Gateway exposes agent list via WebSocket or HTTP
@@ -91,8 +92,8 @@ class OpenClawClient(private val settingsRepository: com.openclaw.voice.data.Set
     }
     
     suspend fun sendMessage(message: String, agentId: String): String {
-        val url = settingsRepository.gatewayUrl.value
-        val token = settingsRepository.gatewayToken.value
+        val url = settingsRepository.gatewayUrl.first()
+        val token = settingsRepository.gatewayToken.first()
         
         // Use OpenAI-compatible chat completions endpoint
         val requestBody = ChatRequest(

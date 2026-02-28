@@ -25,6 +25,7 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import java.util.Locale
 
 class VoiceService : Service(), TextToSpeech.OnInitListener {
@@ -78,12 +79,18 @@ class VoiceService : Service(), TextToSpeech.OnInitListener {
     }
     
     private fun updateTtsLanguage() {
-        val lang = runBlocking { App.instance.settingsRepository.language.first() }
-        val locale = when (lang) {
-            "zh" -> Locale.CHINESE
-            else -> Locale.ENGLISH
+        serviceScope.launch {
+            val lang = try {
+                App.instance.settingsRepository.language.first()
+            } catch (e: Exception) {
+                "zh"
+            }
+            val locale = when (lang) {
+                "zh" -> Locale.CHINESE
+                else -> Locale.ENGLISH
+            }
+            tts?.language = locale
         }
-        tts?.language = locale
     }
 
     private fun startForegroundWithNotification() {

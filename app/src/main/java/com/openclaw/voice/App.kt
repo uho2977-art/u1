@@ -5,12 +5,15 @@ import android.speech.tts.TextToSpeech
 import com.openclaw.voice.data.SettingsRepository
 import com.openclaw.voice.network.OpenClawClient
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import java.util.Locale
 
 class App : Application(), TextToSpeech.OnInitListener {
 
-    private val applicationScope = CoroutineScope(SupervisorJob())
+    private val applicationScope = CoroutineScope(Dispatchers.Default)
     
     lateinit var settingsRepository: SettingsRepository
         private set
@@ -47,12 +50,14 @@ class App : Application(), TextToSpeech.OnInitListener {
     }
     
     fun updateTtsLanguage() {
-        val lang = settingsRepository.language.value
-        val locale = when (lang) {
-            "zh" -> Locale.CHINESE
-            else -> Locale.ENGLISH
+        applicationScope.launch {
+            val lang = settingsRepository.language.first()
+            val locale = when (lang) {
+                "zh" -> Locale.CHINESE
+                else -> Locale.ENGLISH
+            }
+            tts?.language = locale
         }
-        tts?.language = locale
     }
 
     companion object {
