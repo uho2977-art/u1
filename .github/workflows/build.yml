@@ -19,28 +19,18 @@ jobs:
       with:
         java-version: '17'
         distribution: 'temurin'
-        cache: gradle
+    
+    - name: Setup Gradle
+      uses: gradle/actions/setup-gradle@v4
     
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew
     
-    - name: Setup Gradle
-      uses: gradle/actions/setup-gradle@v3
-    
     - name: Build Debug APK
-      run: ./gradlew assembleDebug
+      run: ./gradlew assembleDebug --no-daemon
     
     - name: Upload Debug APK
       uses: actions/upload-artifact@v4
       with:
         name: openclaw-voice-debug
         path: app/build/outputs/apk/debug/*.apk
-    
-    - name: Build Release APK (unsigned)
-      run: ./gradlew assembleRelease
-    
-    - name: Upload Release APK
-      uses: actions/upload-artifact@v4
-      with:
-        name: openclaw-voice-release
-        path: app/build/outputs/apk/release/*.apk
