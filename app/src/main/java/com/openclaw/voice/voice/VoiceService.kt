@@ -133,7 +133,7 @@ class VoiceService : Service(), TextToSpeech.OnInitListener {
             porcupineDetector = PorcupineWakeWordDetector(
                 context = this@VoiceService,
                 accessKey = accessKey,
-                keyword = "hey google", // Use built-in or custom .ppn file path
+                builtInKeyword = PorcupineWakeWordDetector.BUILT_IN_KEYWORDS_MAP["hey google"],
                 onWakeWordDetected = {
                     _serviceState.value = VoiceState.WAKE_WORD_READY
                     onWakeWordDetected?.invoke()

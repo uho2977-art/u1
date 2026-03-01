@@ -22,7 +22,7 @@ import kotlinx.coroutines.launch
  * 
  * Requirements:
  * - Picovoice AccessKey (free tier available at https://picovoice.ai/)
- * - Custom wake word model or use built-in keywords
+ * - Built-in keywords or custom wake word model (.ppn file)
  * 
  * Built-in keywords available:
  * - "hey siri", "ok google", "alexa", "hey google"
@@ -37,18 +37,26 @@ import kotlinx.coroutines.launch
 class PorcupineWakeWordDetector(
     private val context: Context,
     private val accessKey: String,
-    private val keyword: String = "hey google", // Built-in keyword or path to .ppn file
+    private val keywordPath: String? = null, // Path to .ppn file for custom keyword, or null for built-in
+    private val builtInKeyword: Porcupine.BuiltInKeyword? = null, // Built-in keyword to use
     private val onWakeWordDetected: () -> Unit
 ) {
     companion object {
         private const val TAG = "PorcupineWakeWord"
         
-        // Built-in keywords (lowercase)
-        val BUILT_IN_KEYWORDS = listOf(
-            "hey google",
-            "ok google",
-            "hey siri",
-            "alexa"
+        // Porcupine's fixed sample rate
+        const val SAMPLE_RATE = 16000
+        
+        // Built-in keywords mapping
+        val BUILT_IN_KEYWORDS_MAP = mapOf(
+            "hey google" to Porcupine.BuiltInKeyword.HEY_GOOGLE,
+            "ok google" to Porcupine.BuiltInKeyword.OK_GOOGLE,
+            "hey siri" to Porcupine.BuiltInKeyword.HEY_SIRI,
+            "alexa" to Porcupine.BuiltInKeyword.ALEXA,
+            "hey spot" to Porcupine.BuiltInKeyword.HEY_SPOT,
+            "jarvis" to Porcupine.BuiltInKeyword.JARVIS,
+            "computer" to Porcupine.BuiltInKeyword.COMPUTER,
+            "grasshopper" to Porcupine.BuiltInKeyword.GRASSHOPPER
         )
     }
     
@@ -71,22 +79,30 @@ class PorcupineWakeWordDetector(
     fun start(): Boolean {
         if (isRunning) return true
         
+        if (accessKey.isBlank()) {
+            _error.value = "AccessKey 不能为空"
+            return false
+        }
+        
         try {
-            // Initialize Porcupine
-            porcupine = if (BUILT_IN_KEYWORDS.contains(keyword.lowercase())) {
-                // Use built-in keyword
-                Porcupine.Builder()
-                    .setAccessKey(accessKey)
-                    .setKeyword(Porcupine.BuiltInKeyword.valueOf(keyword.uppercase().replace(" ", "_")))
-                    .build(context)
-            } else {
-                // Use custom keyword path (.ppn file)
-                // For custom wake word, provide path to .ppn file
-                Porcupine.Builder()
-                    .setAccessKey(accessKey)
-                    .setCustomKeywordPath(keyword)
-                    .build(context)
+            val builder = Porcupine.Builder()
+                .setAccessKey(accessKey)
+            
+            // Configure keyword - either built-in or custom
+            when {
+                builtInKeyword != null -> {
+                    builder.setKeyword(builtInKeyword)
+                }
+                keywordPath != null -> {
+                    builder.setKeywordPath(keywordPath)
+                }
+                else -> {
+                    // Default to Hey Google as fallback
+                    builder.setKeyword(Porcupine.BuiltInKeyword.HEY_GOOGLE)
+                }
             }
+            
+            porcupine = builder.build(context)
             
             isRunning = true
             startListening()
@@ -112,10 +128,12 @@ class PorcupineWakeWordDetector(
     
     private fun startListening() {
         recordingJob = scope.launch {
-            val audioBuffer = ShortArray(porcupine?.frameLength ?: 512)
+            val frameLength = porcupine?.frameLength ?: 512
+            val audioBuffer = ShortArray(frameLength)
+            
             val audioSource = android.media.AudioRecord(
                 android.media.MediaRecorder.AudioSource.MIC,
-                Porcupine.SAMPLE_RATE,
+                SAMPLE_RATE,
                 android.media.AudioFormat.CHANNEL_IN_MONO,
                 android.media.AudioFormat.ENCODING_PCM_16BIT,
                 audioBuffer.size * 2
@@ -130,7 +148,7 @@ class PorcupineWakeWordDetector(
                         try {
                             val result = porcupine?.process(audioBuffer) ?: -1
                             if (result >= 0) {
-                                Log.d(TAG, "Wake word detected!")
+                                Log.d(TAG, "Wake word detected! Index: $result")
                                 onWakeWordDetected()
                             }
                         } catch (e: PorcupineStopIterationException) {
@@ -144,8 +162,12 @@ class PorcupineWakeWordDetector(
                 Log.e(TAG, "Microphone permission not granted")
                 _error.value = "需要麦克风权限"
             } finally {
-                audioSource.stop()
-                audioSource.release()
+                try {
+                    audioSource.stop()
+                    audioSource.release()
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error releasing AudioRecord: ${e.message}")
+                }
             }
         }
     }
@@ -174,109 +196,11 @@ class PorcupineWakeWordDetector(
     fun isAvailable(): Boolean {
         return porcupine != null && isRunning
     }
-}
-
-/**
- * Alternative wake word detector using amplitude-based detection.
- * Use this when Porcupine AccessKey is not available.
- * 
- * This is a simplified implementation that detects speech activity
- * but cannot recognize specific wake words. The app should use
- * Android's SpeechRecognizer to check if the detected speech
- * contains the wake word.
- */
-class AmplitudeWakeWordDetector(
-    private val onWakeWordDetected: () -> Unit
-) {
-    companion object {
-        private const val TAG = "AmplitudeWakeWord"
-        private const val SAMPLE_RATE = 16000
-        private const val AMPLITUDE_THRESHOLD = 2000.0
-        private const val SPEECH_DURATION_MS = 500L
-    }
     
-    private var job: Job? = null
-    private var isRunning = false
-    
-    private val _isListening = MutableStateFlow(false)
-    val isListening: StateFlow<Boolean> = _isListening.asStateFlow()
-    
-    private var speechStartTime = 0L
-    
-    fun start() {
-        if (isRunning) return
-        isRunning = true
-        
-        job = CoroutineScope(Dispatchers.IO).launch {
-            val bufferSize = android.media.AudioRecord.getMinBufferSize(
-                SAMPLE_RATE,
-                android.media.AudioFormat.CHANNEL_IN_MONO,
-                android.media.AudioFormat.ENCODING_PCM_16BIT
-            )
-            
-            val audioRecord = android.media.AudioRecord(
-                android.media.MediaRecorder.AudioSource.MIC,
-                SAMPLE_RATE,
-                android.media.AudioFormat.CHANNEL_IN_MONO,
-                android.media.AudioFormat.ENCODING_PCM_16BIT,
-                bufferSize
-            )
-            
-            try {
-                if (audioRecord.state != android.media.AudioRecord.STATE_INITIALIZED) {
-                    Log.e(TAG, "AudioRecord not initialized")
-                    return@launch
-                }
-                
-                audioRecord.startRecording()
-                val buffer = ShortArray(bufferSize / 2)
-                
-                while (isRunning) {
-                    val read = audioRecord.read(buffer, 0, buffer.size)
-                    if (read > 0) {
-                        val amplitude = calculateAmplitude(buffer, read)
-                        
-                        if (amplitude > AMPLITUDE_THRESHOLD) {
-                            if (speechStartTime == 0L) {
-                                speechStartTime = System.currentTimeMillis()
-                            } else if (System.currentTimeMillis() - speechStartTime > SPEECH_DURATION_MS) {
-                                // Speech detected for sufficient duration
-                                // Trigger wake word callback
-                                onWakeWordDetected()
-                                _isListening.value = true
-                            }
-                        } else {
-                            speechStartTime = 0L
-                            _isListening.value = false
-                        }
-                    }
-                    
-                    delay(100)
-                }
-                
-                audioRecord.stop()
-            } catch (e: SecurityException) {
-                Log.e(TAG, "Microphone permission not granted")
-            } catch (e: Exception) {
-                Log.e(TAG, "Error in wake word detection: ${e.message}")
-            } finally {
-                audioRecord.release()
-            }
-        }
-    }
-    
-    fun stop() {
-        isRunning = false
-        _isListening.value = false
-        job?.cancel()
-        job = null
-    }
-    
-    private fun calculateAmplitude(buffer: ShortArray, size: Int): Double {
-        var sum = 0.0
-        for (i in 0 until size) {
-            sum += kotlin.math.abs(buffer[i].toDouble())
-        }
-        return sum / size
+    /**
+     * Get the frame length required by Porcupine.
+     */
+    fun getFrameLength(): Int {
+        return porcupine?.frameLength ?: 512
     }
 }
