@@ -53,10 +53,12 @@ class PorcupineWakeWordDetector(
             "ok google" to Porcupine.BuiltInKeyword.OK_GOOGLE,
             "hey siri" to Porcupine.BuiltInKeyword.HEY_SIRI,
             "alexa" to Porcupine.BuiltInKeyword.ALEXA,
-            "hey spot" to Porcupine.BuiltInKeyword.HEY_SPOT,
             "jarvis" to Porcupine.BuiltInKeyword.JARVIS,
             "computer" to Porcupine.BuiltInKeyword.COMPUTER,
-            "grasshopper" to Porcupine.BuiltInKeyword.GRASSHOPPER
+            "grasshopper" to Porcupine.BuiltInKeyword.GRASSHOPPER,
+            "bumblebee" to Porcupine.BuiltInKeyword.BUMBLEBEE,
+            "picovoice" to Porcupine.BuiltInKeyword.PICOVOICE,
+            "porcupine" to Porcupine.BuiltInKeyword.PORCUPINE
         )
     }
     
