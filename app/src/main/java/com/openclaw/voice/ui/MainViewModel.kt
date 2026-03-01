@@ -12,6 +12,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -60,16 +61,19 @@ class MainViewModel : ViewModel() {
         }
         viewModelScope.launch {
             openClawClient.agents.collect { agents ->
+                // First, get the saved agent ID
+                val savedAgentId = try {
+                    settingsRepository.selectedAgentId.first()
+                } catch (e: Exception) {
+                    null
+                }
+                
                 _uiState.update { uiState ->
                     val updatedState = uiState.copy(agents = agents)
                     // Auto-select first agent if none selected
                     if (uiState.selectedAgent == null && agents.isNotEmpty()) {
-                        // Use a local variable to capture the current state
-                        val currentSavedAgentId = try {
-                            settingsRepository.selectedAgentId.first()
-                        } catch (e: Exception) { null }
-                        val agent = if (currentSavedAgentId != null) {
-                            agents.find { it.id == currentSavedAgentId } ?: agents.first()
+                        val agent = if (savedAgentId != null) {
+                            agents.find { it.id == savedAgentId } ?: agents.first()
                         } else {
                             agents.first()
                         }
