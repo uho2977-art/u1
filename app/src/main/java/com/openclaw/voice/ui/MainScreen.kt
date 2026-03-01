@@ -8,9 +8,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Mic
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.VolumeUp
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -19,27 +17,112 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.openclaw.voice.ui.theme.OpenClawVoiceTheme
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 
 @Composable
 fun MainScreen(viewModel: MainViewModel) {
     val uiState by viewModel.uiState.collectAsState()
     
-    Box(modifier = Modifier.fillMaxSize()) {
-        MainContent(
-            uiState = uiState,
-            onEvent = viewModel::onEvent,
-            onWakeWordDetected = { viewModel.onWakeWordDetected() },
-            onSpeechResult = { viewModel.onSpeechResult(it) },
-            onSpeechError = { viewModel.onSpeechError(it) }
+    // Settings screen state
+    var showSettings by remember { mutableStateOf(false) }
+    var settingsState by remember { 
+        mutableStateOf(SettingsState(
+            gatewayUrl = uiState.gatewayUrl,
+            gatewayToken = uiState.gatewayToken
+        ))
+    }
+    
+    val scope = rememberCoroutineScope()
+    
+    // Update settings state when UI state changes
+    LaunchedEffect(uiState.gatewayUrl, uiState.gatewayToken) {
+        settingsState = settingsState.copy(
+            gatewayUrl = uiState.gatewayUrl,
+            gatewayToken = uiState.gatewayToken
         )
-        
-        // Connection status overlay
-        if (!uiState.isConnected && !uiState.showSettings) {
-            ConnectionOverlay(
-                uiState = uiState,
-                onEvent = viewModel::onEvent
+    }
+    
+    // Load settings on first composition
+    LaunchedEffect(Unit) {
+        scope.launch {
+            val url = viewModel.settingsRepository.gatewayUrl.first()
+            val token = viewModel.settingsRepository.gatewayToken.first()
+            val porcupineKey = viewModel.settingsRepository.porcupineAccessKey.first()
+            val wakeWordMode = viewModel.settingsRepository.wakeWordMode.first()
+            val language = viewModel.settingsRepository.language.first()
+            settingsState = SettingsState(
+                gatewayUrl = url,
+                gatewayToken = token,
+                porcupineAccessKey = porcupineKey,
+                wakeWordMode = wakeWordMode,
+                language = language
             )
+        }
+    }
+    
+    if (showSettings) {
+        SettingsScreen(
+            state = settingsState,
+            onEvent = { event ->
+                when (event) {
+                    is SettingsEvent.GatewayUrlChanged -> {
+                        settingsState = settingsState.copy(gatewayUrl = event.url)
+                    }
+                    is SettingsEvent.GatewayTokenChanged -> {
+                        settingsState = settingsState.copy(gatewayToken = event.token)
+                    }
+                    is SettingsEvent.PorcupineKeyChanged -> {
+                        settingsState = settingsState.copy(porcupineAccessKey = event.key)
+                    }
+                    is SettingsEvent.WakeWordModeChanged -> {
+                        settingsState = settingsState.copy(wakeWordMode = event.mode)
+                    }
+                    is SettingsEvent.LanguageChanged -> {
+                        settingsState = settingsState.copy(language = event.language)
+                    }
+                    is SettingsEvent.Connect -> {
+                        scope.launch {
+                            viewModel.settingsRepository.setGatewayUrl(settingsState.gatewayUrl)
+                            viewModel.settingsRepository.setGatewayToken(settingsState.gatewayToken)
+                            viewModel.onEvent(UiEvent.Connect(settingsState.gatewayUrl, settingsState.gatewayToken))
+                        }
+                    }
+                    is SettingsEvent.Save -> {
+                        scope.launch {
+                            viewModel.settingsRepository.setGatewayUrl(settingsState.gatewayUrl)
+                            viewModel.settingsRepository.setGatewayToken(settingsState.gatewayToken)
+                            viewModel.settingsRepository.setPorcupineAccessKey(settingsState.porcupineAccessKey)
+                            viewModel.settingsRepository.setWakeWordMode(settingsState.wakeWordMode)
+                            viewModel.settingsRepository.setLanguage(settingsState.language)
+                        }
+                        showSettings = false
+                    }
+                    is SettingsEvent.DismissError -> {
+                        settingsState = settingsState.copy(error = null)
+                    }
+                }
+            },
+            onBack = { showSettings = false }
+        )
+    } else {
+        Box(modifier = Modifier.fillMaxSize()) {
+            MainContent(
+                uiState = uiState,
+                onEvent = viewModel::onEvent,
+                onWakeWordDetected = { viewModel.onWakeWordDetected() },
+                onSpeechResult = { viewModel.onSpeechResult(it) },
+                onSpeechError = { viewModel.onSpeechError(it) },
+                onOpenSettings = { showSettings = true }
+            )
+            
+            // Connection status overlay
+            if (!uiState.isConnected && !uiState.showSettings) {
+                ConnectionOverlay(
+                    uiState = uiState,
+                    onEvent = viewModel::onEvent
+                )
+            }
         }
     }
 }
@@ -50,7 +133,8 @@ private fun MainContent(
     onEvent: (UiEvent) -> Unit,
     onWakeWordDetected: () -> Unit,
     onSpeechResult: (String?) -> Unit,
-    onSpeechError: (Int) -> Unit
+    onSpeechError: (Int) -> Unit,
+    onOpenSettings: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -124,7 +208,8 @@ private fun MainContent(
         
         BottomActionBar(
             uiState = uiState,
-            onEvent = onEvent
+            onEvent = onEvent,
+            onOpenSettings = onOpenSettings
         )
     }
 }
@@ -190,7 +275,8 @@ private fun VoiceStateIndicator(
 @Composable
 private fun BottomActionBar(
     uiState: UiState,
-    onEvent: (UiEvent) -> Unit
+    onEvent: (UiEvent) -> Unit,
+    onOpenSettings: () -> Unit
 ) {
     Row(
         modifier = Modifier
@@ -214,7 +300,7 @@ private fun BottomActionBar(
         }
         
         // Settings button
-        IconButton(onClick = { onEvent(UiEvent.ToggleSettings) }) {
+        IconButton(onClick = onOpenSettings) {
             Icon(
                 imageVector = Icons.Default.Settings,
                 contentDescription = "设置",
@@ -230,16 +316,6 @@ private fun BottomActionBar(
             selectedAgent = uiState.selectedAgent,
             onSelect = { agent -> onEvent(UiEvent.SelectAgent(agent)) },
             onDismiss = { onEvent(UiEvent.ToggleAgentSelector) }
-        )
-    }
-    
-    // Settings dialog
-    if (uiState.showSettings) {
-        SettingsDialog(
-            currentUrl = uiState.gatewayUrl,
-            currentToken = uiState.gatewayToken,
-            onSave = { url, token -> onEvent(UiEvent.UpdateSettings(url, token)) },
-            onDismiss = { onEvent(UiEvent.ToggleSettings) }
         )
     }
     
@@ -345,51 +421,6 @@ private fun AgentSelectorDialog(
         confirmButton = {
             TextButton(onClick = onDismiss) {
                 Text("关闭")
-            }
-        }
-    )
-}
-
-@Composable
-private fun SettingsDialog(
-    currentUrl: String,
-    currentToken: String,
-    onSave: (String, String) -> Unit,
-    onDismiss: () -> Unit
-) {
-    var url by remember { mutableStateOf(currentUrl) }
-    var token by remember { mutableStateOf(currentToken) }
-    
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("设置") },
-        text = {
-            Column {
-                OutlinedTextField(
-                    value = url,
-                    onValueChange = { url = it },
-                    label = { Text("Gateway URL") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-                OutlinedTextField(
-                    value = token,
-                    onValueChange = { token = it },
-                    label = { Text("Token") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-        },
-        confirmButton = {
-            Button(onClick = { onSave(url, token) }) {
-                Text("保存")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("取消")
             }
         }
     )

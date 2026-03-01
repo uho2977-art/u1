@@ -19,6 +19,9 @@ class SettingsRepository(private val context: Context) {
         val SELECTED_AGENT_ID = stringPreferencesKey("selected_agent_id")
         val LANGUAGE = stringPreferencesKey("language")
         val WAKE_WORD = stringPreferencesKey("wake_word")
+        val PORCUPINE_ACCESS_KEY = stringPreferencesKey("porcupine_access_key")
+        val WAKE_WORD_MODEL_PATH = stringPreferencesKey("wake_word_model_path")
+        val WAKE_WORD_MODE = stringPreferencesKey("wake_word_mode") // "porcupine" or "amplitude"
     }
 
     val gatewayUrl: Flow<String> = context.dataStore.data
@@ -44,6 +47,21 @@ class SettingsRepository(private val context: Context) {
     val wakeWord: Flow<String> = context.dataStore.data
         .map { preferences ->
             preferences[PreferencesKeys.WAKE_WORD] ?: "hey openclaw"
+        }
+
+    val porcupineAccessKey: Flow<String> = context.dataStore.data
+        .map { preferences ->
+            preferences[PreferencesKeys.PORCUPINE_ACCESS_KEY] ?: ""
+        }
+
+    val wakeWordModelPath: Flow<String> = context.dataStore.data
+        .map { preferences ->
+            preferences[PreferencesKeys.WAKE_WORD_MODEL_PATH] ?: ""
+        }
+
+    val wakeWordMode: Flow<String> = context.dataStore.data
+        .map { preferences ->
+            preferences[PreferencesKeys.WAKE_WORD_MODE] ?: "amplitude" // Default to amplitude mode (no Porcupine key needed)
         }
 
     suspend fun setGatewayUrl(url: String) {
@@ -73,6 +91,24 @@ class SettingsRepository(private val context: Context) {
     suspend fun setWakeWord(wakeWord: String) {
         context.dataStore.edit { preferences ->
             preferences[PreferencesKeys.WAKE_WORD] = wakeWord
+        }
+    }
+
+    suspend fun setPorcupineAccessKey(accessKey: String) {
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.PORCUPINE_ACCESS_KEY] = accessKey
+        }
+    }
+
+    suspend fun setWakeWordModelPath(path: String) {
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.WAKE_WORD_MODEL_PATH] = path
+        }
+    }
+
+    suspend fun setWakeWordMode(mode: String) {
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.WAKE_WORD_MODE] = mode
         }
     }
 }

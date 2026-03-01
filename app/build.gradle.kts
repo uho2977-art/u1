@@ -72,6 +72,9 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
 
     implementation(libs.lottie.compose)
+    
+    // Porcupine wake word engine (requires Picovoice AccessKey)
+    implementation(libs.porcupine)
 
     debugImplementation(libs.androidx.ui.tooling)
 }

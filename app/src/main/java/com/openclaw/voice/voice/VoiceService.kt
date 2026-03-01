@@ -36,7 +36,9 @@ class VoiceService : Service(), TextToSpeech.OnInitListener {
     private var tts: TextToSpeech? = null
     private var ttsReady = false
     
-    private var wakeWordDetector: WakeWordDetector? = null
+    // Wake word detector - can be Porcupine or amplitude-based
+    private var porcupineDetector: PorcupineWakeWordDetector? = null
+    private var amplitudeDetector: AmplitudeWakeWordDetector? = null
     
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     
@@ -45,6 +47,9 @@ class VoiceService : Service(), TextToSpeech.OnInitListener {
     
     private val _isListening = MutableStateFlow(false)
     val isListening: StateFlow<Boolean> = _isListening.asStateFlow()
+    
+    private val _wakeWordMode = MutableStateFlow("amplitude")
+    val wakeWordMode: StateFlow<String> = _wakeWordMode.asStateFlow()
     
     // Callbacks
     var onWakeWordDetected: (() -> Unit)? = null
@@ -61,9 +66,9 @@ class VoiceService : Service(), TextToSpeech.OnInitListener {
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
-        initWakeWordDetector()
         initSpeechRecognizer()
         initTts()
+        loadSettingsAndInitWakeWord()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -91,6 +96,67 @@ class VoiceService : Service(), TextToSpeech.OnInitListener {
             }
             tts?.language = locale
         }
+    }
+    
+    private fun loadSettingsAndInitWakeWord() {
+        serviceScope.launch {
+            val mode = App.instance.settingsRepository.wakeWordMode.first()
+            _wakeWordMode.value = mode
+            initWakeWordDetector(mode)
+        }
+    }
+    
+    private fun initWakeWordDetector(mode: String) {
+        // Stop existing detector
+        porcupineDetector?.stop()
+        amplitudeDetector?.stop()
+        porcupineDetector = null
+        amplitudeDetector = null
+        
+        if (mode == "porcupine") {
+            initPorcupineDetector()
+        } else {
+            initAmplitudeDetector()
+        }
+    }
+    
+    private fun initPorcupineDetector() {
+        serviceScope.launch {
+            val accessKey = App.instance.settingsRepository.porcupineAccessKey.first()
+            if (accessKey.isBlank()) {
+                // Fall back to amplitude mode if no access key
+                _wakeWordMode.value = "amplitude"
+                initAmplitudeDetector()
+                return@launch
+            }
+            
+            porcupineDetector = PorcupineWakeWordDetector(
+                context = this@VoiceService,
+                accessKey = accessKey,
+                keyword = "hey google", // Use built-in or custom .ppn file path
+                onWakeWordDetected = {
+                    _serviceState.value = VoiceState.WAKE_WORD_READY
+                    onWakeWordDetected?.invoke()
+                }
+            )
+            
+            val success = porcupineDetector?.start() ?: false
+            if (!success) {
+                // Fall back to amplitude mode on error
+                _wakeWordMode.value = "amplitude"
+                initAmplitudeDetector()
+            }
+        }
+    }
+    
+    private fun initAmplitudeDetector() {
+        amplitudeDetector = AmplitudeWakeWordDetector(
+            onWakeWordDetected = {
+                _serviceState.value = VoiceState.WAKE_WORD_READY
+                onWakeWordDetected?.invoke()
+            }
+        )
+        amplitudeDetector?.start()
     }
 
     private fun startForegroundWithNotification() {
@@ -146,17 +212,6 @@ class VoiceService : Service(), TextToSpeech.OnInitListener {
             VoiceState.PROCESSING -> "正在处理..."
             VoiceState.SPEAKING -> "正在回复..."
         }
-    }
-
-    private fun initWakeWordDetector() {
-        wakeWordDetector = WakeWordDetector(
-            wakeWord = "hey openclaw",
-            onWakeWordDetected = {
-                _serviceState.value = VoiceState.WAKE_WORD_READY
-                onWakeWordDetected?.invoke()
-                startListening()
-            }
-        )
     }
 
     private fun initSpeechRecognizer() {
@@ -254,13 +309,25 @@ class VoiceService : Service(), TextToSpeech.OnInitListener {
         updateNotification()
     }
     
+    fun reloadSettings() {
+        serviceScope.launch {
+            val mode = App.instance.settingsRepository.wakeWordMode.first()
+            _wakeWordMode.value = mode
+            initWakeWordDetector(mode)
+        }
+    }
+    
     fun startWakeWordDetection() {
-        wakeWordDetector?.start()
+        serviceScope.launch {
+            val mode = App.instance.settingsRepository.wakeWordMode.first()
+            initWakeWordDetector(mode)
+        }
         setIdle()
     }
     
     fun stopWakeWordDetection() {
-        wakeWordDetector?.stop()
+        porcupineDetector?.stop()
+        amplitudeDetector?.stop()
     }
 
     private fun updateNotification() {
@@ -272,7 +339,8 @@ class VoiceService : Service(), TextToSpeech.OnInitListener {
         super.onDestroy()
         speechRecognizer?.destroy()
         tts?.shutdown()
-        wakeWordDetector?.stop()
+        porcupineDetector?.stop()
+        amplitudeDetector?.stop()
         serviceScope.cancel()
     }
 

@@ -18,7 +18,7 @@ import kotlinx.coroutines.launch
 
 class MainViewModel : ViewModel() {
 
-    private val settingsRepository: SettingsRepository = App.instance.settingsRepository
+    val settingsRepository: SettingsRepository = App.instance.settingsRepository
     private val openClawClient: OpenClawClient = App.instance.openClawClient
     
     private val _uiState = MutableStateFlow(UiState())
